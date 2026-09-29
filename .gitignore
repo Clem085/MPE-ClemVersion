@@ -4,7 +4,7 @@ node_modules
 out
 .direnv
 mume
-crossnote
+/crossnote
 .vscode-test-web
 pnpm-debug.log*
 .mimosa

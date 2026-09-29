@@ -8,6 +8,10 @@
  */
 const gulp = require('gulp');
 const fs = require('fs');
+const { finished } = require('stream/promises');
+const {
+  buildCrossnoteBrowser,
+} = require('./scripts/build-crossnote-browser.cjs');
 
 gulp.task('clean-out', (cb) => {
   // Delete ./out folder
@@ -17,31 +21,37 @@ gulp.task('clean-out', (cb) => {
   cb();
 });
 
-gulp.task('copy-files', (cb) => {
+gulp.task('copy-files', async () => {
   // Delete ./crossnote directory
   if (fs.existsSync('./crossnote')) {
     fs.rmSync('./crossnote', { recursive: true });
   }
 
   // Copy files (encoding: false prevents Gulp 5 from corrupting binary files like fonts)
-  gulp
+  const dependencies = gulp
     .src('./node_modules/crossnote/out/dependencies/**/*', { encoding: false })
     .pipe(gulp.dest('./crossnote/dependencies/'));
-  gulp
+  const styles = gulp
     .src('./node_modules/crossnote/out/styles/**/*', { encoding: false })
     .pipe(gulp.dest('./crossnote/styles/'));
-  gulp
+  const webview = gulp
     .src('./node_modules/crossnote/out/webview/**/*', { encoding: false })
     .pipe(gulp.dest('./crossnote/webview/'));
   // server-app is the browser app of `crossnote serve` and (from crossnote
   // 0.9.37 on) the shell of the standalone wiki that buildStandaloneWiki
   // embeds. Without it the server app opens as a blank page: the shell HTML
   // loads but its script 404s.
-  gulp
+  const serverApp = gulp
     .src('./node_modules/crossnote/out/server-app/**/*', { encoding: false })
     .pipe(gulp.dest('./crossnote/server-app/'));
 
+  // Wait for the upstream copies before replacing the browser JavaScript;
+  // otherwise a late copy could silently restore the vulnerable bundle.
+  await Promise.all(
+    [dependencies, styles, webview, serverApp].map((stream) =>
+      finished(stream, { readable: false }),
+    ),
+  );
+  await buildCrossnoteBrowser();
   console.log('Copy files done.');
-
-  cb();
 });

@@ -22,6 +22,8 @@ export default tseslint.config(
       'node_modules/**',
       'out/**',
       'crossnote/**',
+      'vendor/**',
+      'scripts/*.cjs',
       '**/*.d.ts',
       'build.js',
       'gulpfile.js',

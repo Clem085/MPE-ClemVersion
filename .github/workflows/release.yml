@@ -54,7 +54,9 @@ jobs:
         run: pnpm run build
 
       - name: Test
-        run: pnpm test
+        run: |
+          pnpm test
+          pnpm test:security:browser
 
       - name: Bump version
         id: bump

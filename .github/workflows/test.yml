@@ -38,6 +38,7 @@ jobs:
           # Node-20-only dependencies (#2394).
           pnpm run build
           pnpm test
+          pnpm test:security:browser
       # vsce needs the Node 20 runtime (its bundled undici touches the `File`
       # global at load — 2.32.0 crashes on Node 18 with "File is not defined"
       # despite engines claiming >= 16 — and 3.x declares engines >= 20), so

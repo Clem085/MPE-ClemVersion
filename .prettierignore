@@ -15,4 +15,5 @@ tsconfig.json
 ## special cases
 mume
 crossnote
+vendor
 package.json

@@ -1,0 +1,21 @@
+diff --git a/lib/index.js b/lib/index.js
+index b80191d7189db33221a5fea2c792698315ca8751..2ef923401345307c12c90c6fb4ca480846b8e742 100644
+--- a/lib/index.js
++++ b/lib/index.js
+@@ -13,4 +13,16 @@ require('./channel')(Sharp);
+ require('./output')(Sharp);
+ require('./utility')(Sharp);
+ 
++// MPE keeps Node 18 support, which rules out sharp >= 0.35. Apply the
++// upstream workarounds before any input can reach the affected decoders:
++// https://github.com/advisories/GHSA-f88m-g3jw-g9cj
++// https://github.com/advisories/GHSA-rgj7-g3m4-5g8c
++// Blocking the parent operations covers both file and buffer loaders.
++Sharp.block({ operation: [
++  'VipsForeignLoadNsgif',
++  'VipsForeignLoadTiff',
++  'VipsForeignLoadVips',
++  'VipsForeignLoadHeif'
++] });
++
+ module.exports = Sharp;

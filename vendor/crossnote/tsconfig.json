@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "jsx": "react",
+    "module": "CommonJS",
+    "target": "ES2020",
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "lib": ["ES2020", "ES2022.Error", "DOM"],
+    "rootDir": ".",
+    "declaration": true,
+    "noUnusedLocals": true,
+    "removeComments": true,
+    "strictNullChecks": true,
+    "esModuleInterop": true,
+    "incremental": true,
+    "emitDeclarationOnly": true,
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "./out/types/",
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "noImplicitAny": true,
+    "strict": true
+  },
+  "include": ["src/**/*", "test/**/*"],
+  "exclude": [
+    "node_modules",
+    "out",
+    "build.js",
+    "gulpfile.js",
+    "tailwind.config.js"
+  ]
+}
