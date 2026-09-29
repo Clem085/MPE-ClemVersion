@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Update the affected Lodash ES, IP address, and query-string dependencies while preserving Node 18 support. Disable unused Puppeteer browser ZIP extraction so the vulnerable extractor is excluded from packaged JavaScript; installed-Chrome PDF export remains supported.
+
 - Rebuild Crossnote's preview, backlinks, graph, and standalone server browser JavaScript with DOMPurify 3.4.14, replacing Monaco's embedded 3.2.7 sanitizer. Preserve the release's existing styles.
 - Apply the upstream Sharp decoder mitigations while retaining Node 18 compatibility. Sharp conversion now rejects GIF, TIFF, native VIPS, and HEIF/AVIF inputs; SVG-to-PNG conversion remains available. This mitigates the reported decoder vulnerabilities without upgrading Sharp or claiming that all dependency audit findings are resolved.
 

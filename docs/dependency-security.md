@@ -1,7 +1,8 @@
 # Dependency security review and targeted mitigations
 
-Reviewed on 2026-09-29 with Node 18.17.1 and pnpm 10.28.0. No Git commits are
-created by this work. This review is not a certification that the dependency
+Initial review on 2026-09-29 with Node 18.17.1 and pnpm 10.28.0. See the
+[follow-up packaged runtime review](runtime-dependency-review.md) for the current
+dependency versions, audit counts and artifact evidence. This review is not a certification that the dependency
 tree is free of vulnerabilities.
 
 ## Browser sanitizer
@@ -85,7 +86,8 @@ fixed by this security change.
 ## Remaining scope
 
 The original audit reported 49 findings (17 high, 26 moderate, 6 low), including
-19 findings on development-tool paths. After this change, the audit reports
+19 findings reported on development-tool paths (the follow-up identified qs
+as also shipped through qiniu/urllib). After this change, the audit reports
 31 findings (17 high, 12 moderate, 2 low); the 18 findings for DOMPurify 3.2.7
 are removed. Sharp remains flagged despite its runtime mitigation.
 Parser/linkifier findings beneath

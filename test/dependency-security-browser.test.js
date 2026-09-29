@@ -1,4 +1,4 @@
-/* global suite, suiteSetup, suiteTeardown, test */
+/* global suite, suiteSetup, suiteTeardown, test, mermaid */
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -37,6 +37,60 @@ suite('browser sanitizer integration', function () {
 
   suiteTeardown(async () => {
     if (browser) await browser.close();
+  });
+
+  test('packaged Mermaid renders flowchart, sequence and class diagrams', async () => {
+    const diagramPage = await browser.newPage();
+    try {
+      await diagramPage.setContent('<body></body>');
+      await diagramPage.addScriptTag({
+        path: path.join(root, 'crossnote/dependencies/mermaid/mermaid.min.js'),
+      });
+      const results = await diagramPage.evaluate(async () => {
+        mermaid.initialize({ startOnLoad: false, securityLevel: 'strict' });
+        const diagrams = [
+          'flowchart LR\nA-->B',
+          'sequenceDiagram\nAlice->>Bob: Hello',
+          'classDiagram\nAnimal <|-- Duck',
+        ];
+        const results = [];
+        for (let i = 0; i < diagrams.length; i++) {
+          results.push(
+            (await mermaid.render('diagram' + i, diagrams[i])).svg.includes(
+              '<svg',
+            ),
+          );
+        }
+        return results;
+      });
+      assert.deepStrictEqual(results, [true, true, true]);
+    } finally {
+      await diagramPage.close();
+    }
+  });
+
+  test('Crossnote exports PDF using installed Chrome after ZIP extraction is disabled', async () => {
+    const { Notebook } = require('crossnote');
+    const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'mpe-pdf-'));
+    try {
+      const file = path.join(dir, 'security.md');
+      fs.writeFileSync(
+        file,
+        '# Dependency security smoke test\n\n**PDF export works.**',
+      );
+      const notebook = await Notebook.init({
+        notebookPath: dir,
+        config: { chromePath: browser.process().spawnfile },
+      });
+      const destination = await notebook
+        .getNoteMarkdownEngine(file)
+        .chromeExport({ openFileAfterGeneration: false });
+      const pdf = fs.readFileSync(destination);
+      assert.strictEqual(pdf.subarray(0, 5).toString(), '%PDF-');
+      assert(pdf.length > 1000);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   test('Monaco and preview sanitizers remove executable content and retain markup', async () => {

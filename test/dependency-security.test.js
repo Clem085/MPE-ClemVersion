@@ -11,6 +11,111 @@ const root = path.resolve(__dirname, '..');
 suite('dependency security mitigations', function () {
   this.timeout(30000);
 
+  test('patched browser ZIP extraction fails closed in both module formats', async () => {
+    const puppeteerRequire = createRequire(
+      crossnoteRequire.resolve('puppeteer-core'),
+    );
+    const directory = path.dirname(
+      puppeteerRequire.resolve('@puppeteer/browsers'),
+    );
+    for (const format of ['cjs', 'esm']) {
+      const { unpackArchive } = await import(
+        require('url').pathToFileURL(
+          path.resolve(directory, '..', format, 'fileUtil.js'),
+        ).href
+      );
+      await assert.rejects(
+        unpackArchive('/nonexistent/browser.zip', os.tmpdir()),
+        /MPE disables browser ZIP extraction/,
+      );
+    }
+    for (const file of [
+      'out/native/extension.js',
+      'out/native/crossnote-serve.js',
+      'out/web/extension.js',
+    ]) {
+      const js = fs.readFileSync(path.join(root, file), 'utf8');
+      assert(!js.includes('node_modules/extract-zip/'), file);
+      assert(js.includes('MPE disables browser ZIP extraction'), file);
+    }
+  });
+
+  test('production qs preserves request serialization and rejects buffer spoofing', () => {
+    const qiniuRequire = createRequire(crossnoteRequire.resolve('qiniu'));
+    const urllibRequire = createRequire(qiniuRequire.resolve('urllib'));
+    const qs = urllibRequire('qs');
+    assert.strictEqual(
+      qs.stringify({ a: { b: 'x y' }, items: ['one', 'two'] }),
+      'a%5Bb%5D=x%20y&items%5B0%5D=one&items%5B1%5D=two',
+    );
+    assert.doesNotThrow(() =>
+      qs.stringify(qs.parse('constructor[isBuffer]=x', { plainObjects: true })),
+    );
+  });
+
+  test('SOCKS IP parser retains address conversion and fixes IPv6 classifications', () => {
+    let dependencyRequire = crossnoteRequire;
+    for (const dependency of [
+      'puppeteer-core',
+      '@puppeteer/browsers',
+      'proxy-agent',
+      'socks-proxy-agent',
+      'socks',
+    ]) {
+      dependencyRequire = createRequire(dependencyRequire.resolve(dependency));
+    }
+    const { Address4, Address6 } = dependencyRequire('ip-address');
+    assert.strictEqual(new Address4('127.0.0.1').correctForm(), '127.0.0.1');
+    assert.strictEqual(new Address6('fe90::1').isLinkLocal(), true);
+    assert.strictEqual(new Address6('fec0::1').isLinkLocal(), false);
+    assert.strictEqual(new Address6('64:ff9b:1::1').isPrivate(), true);
+    assert.strictEqual(new Address6('2001:4860:4860::8888').isPrivate(), false);
+  });
+
+  test('Lodash security fixes retain the Chevrotain parser API', async () => {
+    const mermaidRequire = createRequire(crossnoteRequire.resolve('mermaid'));
+    const chevrotainPath = mermaidRequire.resolve('chevrotain');
+    const chevrotainRequire = createRequire(chevrotainPath);
+    const lodash = await import(
+      require('url').pathToFileURL(chevrotainRequire.resolve('lodash-es')).href
+    );
+    assert.strictEqual(
+      lodash.template('Hello <%= name %>')({ name: 'MPE' }),
+      'Hello MPE',
+    );
+    assert.throws(() =>
+      lodash.template('x', { imports: { 'x) { throw 1; } //': 1 } }),
+    );
+    const marker = '__mpeSecurityMarker';
+    Object.prototype[marker] = true;
+    try {
+      lodash.unset({}, [['__proto__'], marker]);
+      assert.strictEqual(Object.prototype[marker], true);
+    } finally {
+      delete Object.prototype[marker];
+    }
+    const { createToken, Lexer, CstParser } = await import(
+      require('url').pathToFileURL(chevrotainPath).href
+    );
+    const Word = createToken({ name: 'Word', pattern: /[a-z]+/ });
+    class Parser extends CstParser {
+      constructor() {
+        super([Word]);
+        this.RULE('word', () => this.CONSUME(Word));
+        this.performSelfAnalysis();
+      }
+    }
+    const parser = new Parser();
+    parser.input = new Lexer([Word], {
+      positionTracking: 'onlyOffset',
+    }).tokenize('markdown').tokens;
+    assert.strictEqual(parser.word().children.Word[0].image, 'markdown');
+    assert.deepStrictEqual(parser.errors, []);
+    parser.input = [];
+    parser.word();
+    assert.strictEqual(parser.errors.length, 1);
+  });
+
   test('vendored browser inputs match the reviewed upstream snapshot', () => {
     const directory = path.join(root, 'vendor/crossnote');
     const manifest = JSON.parse(

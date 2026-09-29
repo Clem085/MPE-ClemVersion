@@ -1,0 +1,34 @@
+diff --git a/lib/cjs/fileUtil.js b/lib/cjs/fileUtil.js
+index 700e20961b85b567e426b6b154d67c8517f8c3b4..b3292bc8e2d0c242ad9d7f02506fae7509d0dfe0 100644
+--- a/lib/cjs/fileUtil.js
++++ b/lib/cjs/fileUtil.js
+@@ -58,8 +58,10 @@ async function unpackArchive(archivePath, folderPath) {
+         folderPath = path.resolve(process.cwd(), folderPath);
+     }
+     if (archivePath.endsWith('.zip')) {
+-        const extractZip = await import('extract-zip');
+-        await extractZip.default(archivePath, { dir: folderPath });
++        // MPE only launches an installed browser. Do not ship extract-zip's
++        // vulnerable archive writer for a browser-download feature MPE does
++        // not expose (GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3).
++        throw new Error('MPE disables browser ZIP extraction; configure an installed Chrome or Chromium executable.');
+     }
+     else if (archivePath.endsWith('.tar.bz2')) {
+         await extractTar(archivePath, folderPath, 'bzip2');
+diff --git a/lib/esm/fileUtil.js b/lib/esm/fileUtil.js
+index 0fdb25c7b76c8a413446838def20f39dff037334..38329a5b9dcc92b8ae379562dfc8a69c4d88d66a 100644
+--- a/lib/esm/fileUtil.js
++++ b/lib/esm/fileUtil.js
+@@ -18,8 +18,10 @@ export async function unpackArchive(archivePath, folderPath) {
+         folderPath = path.resolve(process.cwd(), folderPath);
+     }
+     if (archivePath.endsWith('.zip')) {
+-        const extractZip = await import('extract-zip');
+-        await extractZip.default(archivePath, { dir: folderPath });
++        // MPE only launches an installed browser. Do not ship extract-zip's
++        // vulnerable archive writer for a browser-download feature MPE does
++        // not expose (GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3).
++        throw new Error('MPE disables browser ZIP extraction; configure an installed Chrome or Chromium executable.');
+     }
+     else if (archivePath.endsWith('.tar.bz2')) {
+         await extractTar(archivePath, folderPath, 'bzip2');
