@@ -1,4 +1,8 @@
 import {
+  isPreviewAppearance,
+  PreviewAppearancePreference,
+} from './preview-appearance';
+import {
   CodeBlockTheme,
   ExportColorScheme,
   FrontMatterRenderingOption,
@@ -37,6 +41,7 @@ type VSCodeMPEConfigKey =
   | 'hideDefaultVSCodeMarkdownPreviewButtons'
   | 'liveUpdate'
   | 'liveUpdateDebounceMs'
+  | 'previewAppearance'
   | 'previewColorScheme'
   | 'previewMode'
   | 'qiniuAccessKey'
@@ -156,6 +161,7 @@ export class MarkdownPreviewEnhancedConfig implements NotebookConfig {
   public readonly imageUploader: ImageUploader;
   public readonly liveUpdate: boolean;
   public readonly liveUpdateDebounceMs: number;
+  public readonly previewAppearance: PreviewAppearancePreference;
   public readonly previewColorScheme: PreviewColorScheme;
   public readonly previewMode: PreviewMode;
   public readonly scrollSync: boolean;
@@ -270,6 +276,10 @@ export class MarkdownPreviewEnhancedConfig implements NotebookConfig {
     this.automaticallyShowPreviewOfMarkdownBeingEdited =
       getMPEConfig<boolean>('automaticallyShowPreviewOfMarkdownBeingEdited') ??
       false;
+    const preference = getMPEConfig<unknown>('previewAppearance');
+    this.previewAppearance = isPreviewAppearance(preference)
+      ? preference
+      : 'system';
     this.previewColorScheme =
       getMPEConfig<PreviewColorScheme>('previewColorScheme') ??
       PreviewColorScheme.selectedPreviewTheme;

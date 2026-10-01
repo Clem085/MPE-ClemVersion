@@ -1,6 +1,7 @@
 const { build } = require('esbuild');
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { loadAppearanceOverlay } = require('./crossnote-appearance-overlay.cjs');
 
 const root = path.resolve(__dirname, '..');
 const source = path.join(root, 'vendor', 'crossnote');
@@ -16,6 +17,17 @@ function sanitizerPlugin() {
   return {
     name: 'mpe-browser-sanitizer',
     setup(builder) {
+      builder.onLoad({ filter: /\.(?:ts|tsx|json)$/ }, async (args) => {
+        if (!args.path.startsWith(source + path.sep)) return;
+        return {
+          contents: await loadAppearanceOverlay(args.path),
+          loader: args.path.endsWith('.tsx')
+            ? 'tsx'
+            : args.path.endsWith('.json')
+              ? 'json'
+              : 'ts',
+        };
+      });
       builder.onResolve({ filter: /dompurify\/dompurify\.js$/ }, () => ({
         path: require.resolve('dompurify'),
       }));

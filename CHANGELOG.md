@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add a Preview Appearance context-menu control with System (default), Light, and Dark modes. Open previews update immediately, ordinary Mermaid diagrams inherit the same readable palette, and Chrome PDF export takes an immutable snapshot of the effective preview appearance with backgrounds preserved. Document-level Mermaid directives, theme variables, classes, and explicit styles continue to override automatic defaults.
+
 ### Security
 
 - Update the affected Lodash ES, IP address, and query-string dependencies while preserving Node 18 support. Disable unused Puppeteer browser ZIP extraction so the vulnerable extractor is excluded from packaged JavaScript; installed-Chrome PDF export remains supported.

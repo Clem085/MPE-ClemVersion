@@ -1,16 +1,12 @@
+import { appearanceConfig } from './preview-appearance';
 import {
   Notebook,
   NotebookConfig,
   PreviewMode,
-  PreviewTheme,
   loadConfigsInDirectory,
 } from 'crossnote';
 import * as vscode from 'vscode';
-import {
-  MarkdownPreviewEnhancedConfig,
-  PreviewColorScheme,
-  getMPEConfig,
-} from './config';
+import { MarkdownPreviewEnhancedConfig, getMPEConfig } from './config';
 import {
   OWNED_EDITOR_ASSOCIATIONS_KEY,
   computeEditorAssociations,
@@ -27,7 +23,10 @@ import { wrapVSCodeFSAsApi } from './vscode-fs';
 
 class NotebooksManager {
   private notebooks: Notebook[] = [];
-  public systemColorScheme: 'light' | 'dark' = 'light';
+  public get systemColorScheme(): 'light' | 'dark' {
+    return this.getEditorColorScheme();
+  }
+  private configRevision = 0;
   private fileWatcher: FileWatcher;
   private currentMPEConfig: MarkdownPreviewEnhancedConfig =
     MarkdownPreviewEnhancedConfig.getCurrentConfig();
@@ -219,22 +218,18 @@ class NotebooksManager {
 
     // VSCode config
     const vscodeMPEConfig = MarkdownPreviewEnhancedConfig.getCurrentConfig();
-    this.currentMPEConfig = vscodeMPEConfig;
 
-    // Preview theme
-    const previewTheme = this.getPreviewTheme(
-      vscodeMPEConfig.previewTheme,
-      vscodeMPEConfig.previewColorScheme,
+    return appearanceConfig(
+      {
+        ...vscodeMPEConfig,
+        ...globalConfig,
+        ...workspaceConfig,
+        globalCss:
+          (globalConfig.globalCss ?? '') + (workspaceConfig.globalCss ?? ''),
+      },
+      vscodeMPEConfig.previewAppearance,
+      this.getEditorColorScheme(),
     );
-
-    return {
-      ...vscodeMPEConfig,
-      ...globalConfig,
-      ...workspaceConfig,
-      globalCss:
-        (globalConfig.globalCss ?? '') + (workspaceConfig.globalCss ?? ''),
-      previewTheme,
-    };
   }
 
   /**
@@ -250,18 +245,6 @@ class NotebooksManager {
     notebook.previewScriptsEnabled =
       vscode.workspace.isTrusted &&
       (getMPEConfig<boolean>('enablePreviewScripts') ?? false);
-  }
-
-  public setSystemColorScheme(colorScheme: 'light' | 'dark') {
-    if (this.systemColorScheme !== colorScheme) {
-      this.systemColorScheme = colorScheme;
-      if (
-        getMPEConfig<PreviewColorScheme>('previewColorScheme') ===
-        PreviewColorScheme.systemColorScheme
-      ) {
-        this.updateAllNotebooksConfig();
-      }
-    }
   }
 
   public async updateWorkbenchEditorAssociationsBasedOnPreviewMode() {
@@ -294,6 +277,7 @@ class NotebooksManager {
   }
 
   public async updateAllNotebooksConfig() {
+    const revision = ++this.configRevision;
     const previewProviders = getAllPreviewProviders();
     await this.updateWorkbenchEditorAssociationsBasedOnPreviewMode();
     const newMPEConfig = MarkdownPreviewEnhancedConfig.getCurrentConfig();
@@ -310,9 +294,15 @@ class NotebooksManager {
       this.notebooks.map(async (notebook) => {
         this.applyPreviewScripts(notebook);
         const config = await this.loadNotebookConfig(notebook.notebookPath);
-        notebook.updateConfig(config);
+        if (revision === this.configRevision) {
+          notebook.updateConfig(config);
+        }
       }),
     );
+
+    if (revision !== this.configRevision) {
+      return;
+    }
 
     // Refresh all previews
     previewProviders.forEach((provider) => {
@@ -320,33 +310,6 @@ class NotebooksManager {
     });
 
     this.currentMPEConfig = newMPEConfig;
-  }
-
-  private getPreviewThemeByLightOrDark(
-    theme: PreviewTheme,
-    color: 'light' | 'dark',
-  ): PreviewTheme {
-    switch (theme) {
-      case 'atom-dark.css':
-      case 'atom-light.css': {
-        return color === 'light' ? 'atom-light.css' : 'atom-dark.css';
-      }
-      case 'github-dark.css':
-      case 'github-light.css': {
-        return color === 'light' ? 'github-light.css' : 'github-dark.css';
-      }
-      case 'one-light.css':
-      case 'one-dark.css': {
-        return color === 'light' ? 'one-light.css' : 'one-dark.css';
-      }
-      case 'solarized-light.css':
-      case 'solarized-dark.css': {
-        return color === 'light' ? 'solarized-light.css' : 'solarized-dark.css';
-      }
-      default: {
-        return theme;
-      }
-    }
   }
 
   public getEditorColorScheme(): 'light' | 'dark' {
@@ -364,20 +327,10 @@ class NotebooksManager {
     }
   }
 
-  private getPreviewTheme(
-    theme: PreviewTheme,
-    colorScheme: PreviewColorScheme,
-  ): PreviewTheme {
-    if (colorScheme === PreviewColorScheme.editorColorScheme) {
-      return this.getPreviewThemeByLightOrDark(
-        theme,
-        this.getEditorColorScheme(),
-      );
-    } else if (colorScheme === PreviewColorScheme.systemColorScheme) {
-      return this.getPreviewThemeByLightOrDark(theme, this.systemColorScheme);
-    } else {
-      return theme;
-    }
+  public getEffectivePreviewAppearance(): 'light' | 'dark' {
+    return this.currentMPEConfig.previewAppearance === 'system'
+      ? this.getEditorColorScheme()
+      : this.currentMPEConfig.previewAppearance;
   }
 
   public async refreshNoteRelations(_noteFilePath: string) {}

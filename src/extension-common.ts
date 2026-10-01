@@ -1,3 +1,4 @@
+import { isPreviewAppearance } from './preview-appearance';
 // For both node.js and browser environments
 import { PreviewMode, utility } from 'crossnote';
 import { SHA256 } from 'crypto-js';
@@ -9,7 +10,7 @@ import {
   WikilinkDocumentLinkProvider,
   openWikilinkTarget,
 } from './wikilink-document-link-provider';
-import { PreviewColorScheme, getMPEConfig, updateMPEConfig } from './config';
+import { getMPEConfig, updateMPEConfig } from './config';
 import {
   formatPreviewSourcePath,
   isMpePreviewTabInput,
@@ -486,16 +487,9 @@ export async function initExtensionCommon(context: vscode.ExtensionContext) {
     previewProvider.openImageHelper(uri);
   }
 
-  async function webviewFinishLoading({
-    uri,
-    systemColorScheme,
-  }: {
-    uri: string;
-    systemColorScheme: 'light' | 'dark';
-  }) {
+  async function webviewFinishLoading({ uri }: { uri: string }) {
     const sourceUri = vscode.Uri.parse(uri);
     const previewProvider = await getPreviewContentProvider(sourceUri);
-    notebooksManager.setSystemColorScheme(systemColorScheme);
     // Guard against stale webviewFinishLoading callbacks from a previous file
     // (can happen when the user switches files before the webview finishes loading)
     if (!previewProvider.shouldUpdateMarkdown(sourceUri)) {
@@ -696,6 +690,17 @@ export async function initExtensionCommon(context: vscode.ExtensionContext) {
         break;
       }
     }
+  }
+
+  async function setPreviewAppearance(_uri: string, preference: unknown) {
+    if (!isPreviewAppearance(preference)) {
+      return;
+    }
+    await updateMPEConfig(
+      'previewAppearance',
+      preference,
+      vscode.ConfigurationTarget.Global,
+    );
   }
 
   function setPreviewTheme(_uri: string, theme: string) {
@@ -1415,16 +1420,19 @@ export async function initExtensionCommon(context: vscode.ExtensionContext) {
     }),
   );
 
-  // Changed editor color theme
+  // The client theme is authoritative, including in Remote WSL/SSH.
   context.subscriptions.push(
-    vscode.window.onDidChangeActiveColorTheme((_theme) => {
-      if (
-        getMPEConfig<PreviewColorScheme>('previewColorScheme') ===
-        PreviewColorScheme.editorColorScheme
-      ) {
-        notebooksManager.updateAllNotebooksConfig();
+    vscode.window.onDidChangeActiveColorTheme(() => {
+      if ((getMPEConfig('previewAppearance') ?? 'system') === 'system') {
+        void notebooksManager.updateAllNotebooksConfig();
       }
     }),
+  );
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      '_crossnote.setPreviewAppearance',
+      setPreviewAppearance,
+    ),
   );
 
   /*

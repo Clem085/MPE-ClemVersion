@@ -12,11 +12,15 @@ const recorder = {
   clipboard: { text: null },
   warnings: [],
   activeEditorHandlers: [],
+  colorThemeHandlers: [],
+  configurationUpdates: [],
   reset() {
     this.commands = new Map();
     this.clipboard = { text: null };
     this.warnings = [];
     this.activeEditorHandlers = [];
+    this.colorThemeHandlers = [];
+    this.configurationUpdates = [];
   },
 };
 
@@ -104,7 +108,10 @@ const VSCODE_STUB_SOURCE = `
       onDidChangeTextEditorVisibleRanges: event,
       onDidChangeTextEditorViewColumn: event,
       onDidChangeVisibleTextEditors: event,
-      onDidChangeActiveColorTheme: event,
+      onDidChangeActiveColorTheme: (handler) => {
+        recorder.colorThemeHandlers.push(handler);
+        return disposable;
+      },
       onDidChangeWindowState: event,
       visibleTextEditors: [],
       activeTextEditor: undefined,
@@ -118,7 +125,10 @@ const VSCODE_STUB_SOURCE = `
       textDocuments: [],
       getConfiguration: () => ({
         get: (section) => (globalThis.__vscodeStubConfiguration ?? {})[section],
-        update: async () => {},
+        update: async (section, value, target) => {
+          recorder.configurationUpdates.push({ section, value, target });
+          globalThis.__vscodeStubConfiguration[section] = value;
+        },
       }),
       getWorkspaceFolder: (uri) => globalThis.__vscodeStubWorkspaceFolder(uri),
       asRelativePath: (uri) => globalThis.__vscodeStubRelativePath(uri),
@@ -167,7 +177,8 @@ const VSCODE_STUB_SOURCE = `
     Disposable: class { static from() { return disposable; } dispose() {} },
     WorkspaceEdit: class { insert() {} replace() {} delete() {} },
     ExtensionMode: { Production: 1, Development: 2, Test: 3 },
-    ColorThemeKind: { Light: 1, Dark: 2 },
+    ColorThemeKind: { Light: 1, Dark: 2, HighContrast: 3, HighContrastLight: 4 },
+    ConfigurationTarget: { Global: 1, Workspace: 2, WorkspaceFolder: 3 },
     ProgressLocation: { Notification: 15 },
     StatusBarAlignment: { Left: 1, Right: 2 },
     TabInputCustom: class {},

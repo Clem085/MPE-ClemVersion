@@ -38,7 +38,7 @@
     "run-in-browser:watch": "node build.js --web-dev && concurrently \"vscode-test-web --browser none --extensionDevelopmentPath=. ${SERVE_DIR:-.}\" \"npx http-server ./crossnote -p 6789 --cors\" \"node build.js --watch\"",
     "run-in-vscode-dev": "npx serve --cors -l 5000 --ssl-cert $HOME/certs/localhost.pem --ssl-key $HOME/certs/localhost-key.pem",
     "test": "pnpm test:unit",
-    "test:unit": "mocha --ui tdd --reporter spec test/find-fragment-target-line.test.js test/block-id-helpers.test.js test/rank-by-closeness.test.js test/current-preview-source.test.js test/preview-source-integration.test.js test/l10n-bundles.test.js test/native-runtime-compat.test.js test/crossnote-serve-output.test.js test/filesystem-root-warning.test.js test/custom-editor-options.test.js test/editor-associations.test.js test/custom-editor-single-preview.test.js test/dependency-security.test.js",
+    "test:unit": "mocha --ui tdd --reporter spec test/find-fragment-target-line.test.js test/block-id-helpers.test.js test/rank-by-closeness.test.js test/current-preview-source.test.js test/preview-source-integration.test.js test/l10n-bundles.test.js test/native-runtime-compat.test.js test/crossnote-serve-output.test.js test/filesystem-root-warning.test.js test/custom-editor-options.test.js test/editor-associations.test.js test/custom-editor-single-preview.test.js test/dependency-security.test.js test/preview-appearance.test.js test/preview-appearance-integration.test.js",
     "vscode:prepublish": "pnpm install --frozen-lockfile && pnpm build",
     "watch": "gulp copy-files && gulp clean-out && node build.js --watch",
     "test:security:browser": "mocha --ui tdd --reporter spec test/dependency-security-browser.test.js"
@@ -306,7 +306,8 @@
             "%markdown-preview-enhanced.previewColorScheme.markdownEnumDescriptions.0%",
             "%markdown-preview-enhanced.previewColorScheme.markdownEnumDescriptions.1%",
             "%markdown-preview-enhanced.previewColorScheme.markdownEnumDescriptions.2%"
-          ]
+          ],
+          "deprecationMessage": "Use Preview Appearance. The previewColorScheme setting no longer controls appearance."
         },
         "markdown-preview-enhanced.enableTypographer": {
           "description": "%markdown-preview-enhanced.enableTypographer.description%",
@@ -617,7 +618,7 @@
           "description": "%markdown-preview-enhanced.qiniuDomain.description%"
         },
         "markdown-preview-enhanced.printBackground": {
-          "description": "%markdown-preview-enhanced.printBackground.description%",
+          "description": "Used by other exporters. Preview-matched Chrome exports always preserve backgrounds.",
           "default": false,
           "type": "boolean"
         },
@@ -881,6 +882,22 @@
           "description": "%markdown-preview-enhanced.aiTranslationAutoUpdate.description%",
           "default": false,
           "type": "boolean"
+        },
+        "markdown-preview-enhanced.previewAppearance": {
+          "type": "string",
+          "scope": "application",
+          "enum": [
+            "system",
+            "light",
+            "dark"
+          ],
+          "default": "system",
+          "enumDescriptions": [
+            "Follow the active VS Code appearance.",
+            "Always use Light.",
+            "Always use Dark."
+          ],
+          "description": "Appearance shared by Markdown preview, automatic Mermaid styling, and Chrome PDF export."
         }
       }
     },

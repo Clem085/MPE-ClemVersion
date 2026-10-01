@@ -25,6 +25,7 @@ import {
   isVSCodeWebExtension,
   isVSCodewebExtensionDevMode,
 } from './utils';
+import { createAppearanceExportEngine } from './appearance-export';
 
 if (isVSCodeWebExtension()) {
   console.debug('* Using crossnote version: ', getCrossnoteVersion());
@@ -115,6 +116,7 @@ const WEBVIEW_MESSAGE_COMMANDS: Set<string> = new Set([
   'setCodeBlockTheme',
   'setImageUploader',
   'setPreviewTheme',
+  'setPreviewAppearance',
   'setRevealjsTheme',
   'setZoomLevel',
   'showBacklinks',
@@ -1091,7 +1093,7 @@ export class PreviewProvider {
                 ` ${
                   this.getNotebooksManager().systemColorScheme === 'dark'
                     ? 'system-dark'
-                    : 'system-ligtht'
+                    : 'system-light'
                 } ${
                   this.getNotebooksManager().getEditorColorScheme() === 'dark'
                     ? 'editor-dark'
@@ -1694,7 +1696,7 @@ export class PreviewProvider {
             ` ${
               this.getNotebooksManager().systemColorScheme === 'dark'
                 ? 'system-dark'
-                : 'system-ligtht'
+                : 'system-light'
             } ${
               this.getNotebooksManager().getEditorColorScheme() === 'dark'
                 ? 'editor-dark'
@@ -1767,7 +1769,10 @@ export class PreviewProvider {
           vscode.l10n.t('Not supported in MPE web extension.'),
         );
       } else {
-        engine
+        createAppearanceExportEngine(
+          engine,
+          this.getNotebooksManager().getEffectivePreviewAppearance(),
+        )
           .chromeExport({ fileType: type, openFileAfterGeneration: true })
           .then((dest) => {
             vscode.window.showInformationMessage(

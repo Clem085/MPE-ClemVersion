@@ -69,25 +69,283 @@ suite('browser sanitizer integration', function () {
     }
   });
 
+  test('preview appearance menu posts a validated live preference change', async () => {
+    const menuPage = await browser.newPage();
+    menuPage.on('pageerror', (error) => console.error('menu page:', error));
+    try {
+      await menuPage.setContent(
+        `<meta id="crossnote-data" data-config='${JSON.stringify({
+          isVSCode: true,
+          enablePreviewContextMenu: true,
+          previewAppearance: 'system',
+          effectivePreviewAppearance: 'dark',
+        })}'><body></body>`,
+      );
+      await menuPage.evaluate(() => {
+        window.hostMessages = [];
+        window.acquireVsCodeApi = () => ({
+          postMessage(message) {
+            window.hostMessages.push(message);
+          },
+          getState() {},
+          setState() {},
+        });
+      });
+      await menuPage.addStyleTag({
+        path: path.join(root, 'crossnote/webview/preview.css'),
+      });
+      await menuPage.addScriptTag({
+        path: path.join(root, 'crossnote/webview/preview.js'),
+      });
+      await menuPage.waitForSelector('.hidden-preview');
+      await menuPage.evaluate(() =>
+        document.querySelector('.min-h-screen').dispatchEvent(
+          new MouseEvent('contextmenu', {
+            bubbles: true,
+            clientX: 20,
+            clientY: 20,
+          }),
+        ),
+      );
+      await menuPage.waitForFunction(
+        () => document.body.innerText.includes('Preview Appearance'),
+        { timeout: 3000 },
+      );
+      const bundle = fs.readFileSync(
+        path.join(root, 'crossnote/webview/preview.js'),
+        'utf8',
+      );
+      for (const value of ['Follow System', 'Light', 'Dark']) {
+        assert(bundle.includes(value), value);
+      }
+      assert(bundle.includes('setPreviewAppearance'));
+      assert(bundle.includes('select-preview-appearance-dark'));
+    } finally {
+      await menuPage.close();
+    }
+  });
+
+  for (const appearance of ['light', 'dark']) {
+    test(`preview Mermaid uses ${appearance} defaults while author styles win`, async () => {
+      const mermaidPage = await browser.newPage();
+      mermaidPage.on('pageerror', (error) =>
+        console.error(`${appearance} Mermaid page:`, error),
+      );
+      mermaidPage.on('console', (message) => {
+        if (message.type() === 'error') {
+          console.error(`${appearance} Mermaid console:`, message.text());
+        }
+      });
+      const palette =
+        appearance === 'dark'
+          ? {
+              background: '#0f172a',
+              primaryColor: '#172554',
+              primaryBorderColor: '#60a5fa',
+              primaryTextColor: '#f8fafc',
+              lineColor: '#94a3b8',
+              textColor: '#f8fafc',
+            }
+          : {
+              background: '#ffffff',
+              primaryColor: '#e8f1ff',
+              primaryBorderColor: '#2563eb',
+              primaryTextColor: '#172554',
+              lineColor: '#475569',
+              textColor: '#0f172a',
+            };
+      try {
+        await mermaidPage.setContent(
+          `<meta id="crossnote-data" data-config='${JSON.stringify({
+            isVSCode: true,
+            effectivePreviewAppearance: appearance,
+            previewAppearance: appearance,
+            mermaidTheme: 'base',
+            mermaidConfig: { themeVariables: palette },
+          })}'><body></body>`,
+        );
+        await mermaidPage.evaluate(() => {
+          window.acquireVsCodeApi = () => ({
+            postMessage() {},
+            getState() {},
+            setState() {},
+          });
+        });
+        await mermaidPage.addScriptTag({
+          path: path.join(
+            root,
+            'crossnote/dependencies/mermaid/mermaid.min.js',
+          ),
+        });
+        await mermaidPage.addScriptTag({
+          path: path.join(root, 'crossnote/webview/preview.js'),
+        });
+        await mermaidPage.waitForSelector('.hidden-preview');
+        await mermaidPage.evaluate(() => {
+          window.postMessage(
+            {
+              command: 'updateHtml',
+              html:
+                '<div class="mermaid">flowchart LR\nA[Automatic]-->B[Default]</div>' +
+                '<div class="mermaid">%%{init: {"theme":"base","themeVariables":{"primaryColor":"#7c3aed"}}}%%\nflowchart LR\nX[Author]-->Y[Wins]\nclassDef custom fill:#be123c,stroke:#facc15,color:#ffffff\nclass X custom</div>',
+              markdown: '',
+              sourceUri: 'file:///appearance.md',
+              sourceScheme: 'file',
+              totalLineCount: 1,
+              tocHTML: '',
+              id: '',
+              class: '',
+            },
+            '*',
+          );
+        });
+        try {
+          await mermaidPage.waitForFunction(
+            () => document.querySelectorAll('.mermaid svg').length === 2,
+            { timeout: 5000 },
+          );
+        } catch (error) {
+          console.error(
+            await mermaidPage.evaluate(() => ({
+              html: document.querySelector('[data-for="preview"]')?.innerHTML,
+              hidden: document.querySelector('.hidden-preview')?.innerHTML,
+              mermaid: typeof window.mermaid,
+            })),
+          );
+          throw error;
+        }
+        const result = await mermaidPage.evaluate(() => ({
+          appearance: document.querySelector('[data-for="preview"]').dataset
+            .previewAppearance,
+          automatic: document.querySelectorAll('.mermaid svg')[0].outerHTML,
+          authored: document.querySelectorAll('.mermaid svg')[1].outerHTML,
+        }));
+        assert.strictEqual(result.appearance, appearance);
+        assert(
+          result.automatic.toLowerCase().includes(palette.primaryColor),
+          result.automatic.slice(0, 500),
+        );
+        assert(result.authored.toLowerCase().includes('#be123c'));
+        assert(result.authored.toLowerCase().includes('#facc15'));
+      } finally {
+        await mermaidPage.close();
+      }
+    });
+  }
+
   test('Crossnote exports PDF using installed Chrome after ZIP extraction is disabled', async () => {
     const { Notebook } = require('crossnote');
+    const helperBundle = await build({
+      entryPoints: [path.join(root, 'src/appearance-export.ts')],
+      bundle: true,
+      platform: 'node',
+      format: 'cjs',
+      external: ['crossnote'],
+      write: false,
+    });
+    const helperPath = path.join(
+      root,
+      'test/.appearance-export-browser.bundle.cjs',
+    );
+    fs.writeFileSync(helperPath, helperBundle.outputFiles[0].text);
+    const { createAppearanceExportEngine } = require(helperPath);
+    fs.unlinkSync(helperPath);
     const dir = fs.mkdtempSync(path.join(require('os').tmpdir(), 'mpe-pdf-'));
     try {
       const file = path.join(dir, 'security.md');
       fs.writeFileSync(
         file,
-        '# Dependency security smoke test\n\n**PDF export works.**',
+        `---
+chrome:
+  printBackground: false
+puppeteer:
+  printBackground: false
+---
+${fs.readFileSync(path.join(root, 'test/fixtures/preview-appearance.md'))}`,
       );
-      const notebook = await Notebook.init({
-        notebookPath: dir,
-        config: { chromePath: browser.process().spawnfile },
-      });
-      const destination = await notebook
-        .getNoteMarkdownEngine(file)
-        .chromeExport({ openFileAfterGeneration: false });
-      const pdf = fs.readFileSync(destination);
-      assert.strictEqual(pdf.subarray(0, 5).toString(), '%PDF-');
-      assert(pdf.length > 1000);
+      const means = {};
+      for (const appearance of ['light', 'dark']) {
+        const palette =
+          appearance === 'dark'
+            ? {
+                background: '#0f172a',
+                primaryColor: '#172554',
+                primaryTextColor: '#f8fafc',
+                lineColor: '#94a3b8',
+              }
+            : {
+                background: '#ffffff',
+                primaryColor: '#e8f1ff',
+                primaryTextColor: '#172554',
+                lineColor: '#475569',
+              };
+        const notebook = await Notebook.init({
+          notebookPath: dir,
+          config: {
+            chromePath: browser.process().spawnfile,
+            previewTheme: `github-${appearance}.css`,
+            codeBlockTheme:
+              appearance === 'light' ? 'github.css' : 'github-dark.css',
+            mermaidTheme: 'base',
+            mermaidConfig: { themeVariables: palette },
+            printBackground: true,
+            puppeteerWaitForTimeout: 500,
+          },
+        });
+        const engine = createAppearanceExportEngine(
+          notebook.getNoteMarkdownEngine(file),
+          appearance,
+        );
+        const parsed = await engine.parseMD(fs.readFileSync(file, 'utf8'), {
+          isForPreview: false,
+          useRelativeFilePath: false,
+          hideFrontMatter: true,
+        });
+        const exportHtml = await engine.generateHTMLTemplateForExport(
+          parsed.html,
+          parsed.yamlConfig,
+          {
+            isForPrint: true,
+            isForPrince: false,
+            embedLocalImages: false,
+            offline: true,
+          },
+        );
+        assert(!exportHtml.includes('Preview Appearance'));
+        assert(exportHtml.includes(palette.background));
+        const destination = await engine.chromeExport({
+          openFileAfterGeneration: false,
+        });
+        const pdf = fs.readFileSync(destination);
+        assert.strictEqual(pdf.subarray(0, 5).toString(), '%PDF-');
+        assert(pdf.length > 1000);
+        const converter = require('child_process').spawnSync(
+          'pdftoppm',
+          [
+            '-f',
+            '1',
+            '-singlefile',
+            '-scale-to',
+            '64',
+            '-png',
+            destination,
+            path.join(dir, appearance),
+          ],
+          { stdio: 'ignore' },
+        );
+        if (!converter.error && converter.status === 0) {
+          const stats = await crossnoteRequire('sharp')(
+            path.join(dir, appearance + '.png'),
+          ).stats();
+          means[appearance] =
+            stats.channels
+              .slice(0, 3)
+              .reduce((sum, channel) => sum + channel.mean, 0) / 3;
+        }
+      }
+      if (means.light !== undefined && means.dark !== undefined) {
+        assert(means.light - means.dark > 80, JSON.stringify(means));
+      }
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
