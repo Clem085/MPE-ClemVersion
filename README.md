@@ -1,6 +1,16 @@
 # Note: Project Archived
 # See: __NEW REPO__ for better (and much simple) Dark/Light PDF Implemnetation
 
+
+
+
+
+
+
+
+
+------
+<br><br><br><br><br><br><br><br><br><br>
 <h1 align="center"> Markdown Preview Enhanced </h1>
 
 ![intro](https://user-images.githubusercontent.com/1908863/28495106-30b3b15e-6f09-11e7-8eb6-ca4ca001ab15.png)
